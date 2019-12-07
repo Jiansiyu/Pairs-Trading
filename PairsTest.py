@@ -138,7 +138,6 @@ data = pd.DataFrame()
 #stocks = ['AAPL', 'ADBE', 'SYMC', 'EBAY', 'MSFT', 'QCOM', 'HPQ', 'JNPR', 'AMD', 'IBM']
 '''
 changed by siyu
-
 Get the nasdaq NDX 100 top30 stocks
 '''
 from FinalProject.DataAcquisition import StockDataAcquire
@@ -200,6 +199,24 @@ print(pairs)
 
 """According to this heatmap which plots the various p-values for all of the pairs, we've got 4 pairs that appear to be cointegrated. Let's plot their ratios on a graph to see what's going on."""
 
+def zscore(series):
+  return (series - series.mean()) / np.std(series)
+
+for stockPair in pairs:
+  print("******** {} vs {} ********".format(stockPair[0],stockPair[1]))
+  stock1=all_prices[stockPair[0]]
+  stock2=all_prices[stockPair[1]]
+  score, pvalue, _ = coint(stock1, stock2)
+  print(" score :{}".format(score))
+  print(" pvalue:{}".format(pvalue))
+
+  price_ratios= stock1/stock2
+  price_ratios.plot()
+  plt.axhline(price_ratios.mean())
+  plt.title('{} vs {}'.format(stockPair[0],stockPair[1]))
+  plt.show()
+  
+
 S1 = all_prices['ADBE']
 S2 = all_prices['MSFT']
 score, pvalue, _ = coint(S1, S2)
@@ -253,8 +270,8 @@ Remember from stats class? The z score is calculated by:
 ###*Z Score (Value) = (Value - Mean) / Standard Deviation*
 """
 
-def zscore(series):
-  return (series - series.mean()) / np.std(series)
+#def zscore(series):
+#  return (series - series.mean()) / np.std(series)
 
 zscore(am_ratios).plot()
 plt.axhline(zscore(am_ratios).mean())
