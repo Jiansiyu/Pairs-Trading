@@ -109,7 +109,7 @@ When α is larger than usual, we sell Y and buy X.
 
 Now let's find some actual securities that are cointegrated based on historical data.
 """
-
+'''
 def find_cointegrated_pairs(data):
   n = data.shape[1]
   score_matrix = np.zeros((n, n))
@@ -125,9 +125,39 @@ def find_cointegrated_pairs(data):
       pvalue = result[1]
       score_matrix[i,j] = score
       pvalue_matrix[i, j] = pvalue
-      if pvalue < 0.02:
+      if pvalue < 0.002:
         pairs.append((keys[i], keys[j]))
   return score_matrix, pvalue_matrix, pairs
+'''
+import csv
+def find_cointegrated_pairs(data):
+    stockList=[]
+    n = data.shape[1]
+    score_matrix = np.zeros((n, n))
+    pvalue_matrix = np.ones((n, n))
+    keys = data.keys()
+    pairs = [] # We store the stock pairs that are likely to be cointegrated
+    for i in range(n):
+        for j in range(i+1, n):
+            S1 = data[keys[i]]
+            S2 = data[keys[j]]
+            result = coint(S1, S2)
+            score = result[0] # t-score
+            pvalue = result[1]
+            score_matrix[i,j] = score
+            pvalue_matrix[i, j] = pvalue
+            if pvalue < 0.002:
+                pairs.append((keys[i], keys[j]))
+                item=[]
+                item.append(score)
+                item.append(pvalue)
+                item.append(pairs)
+                stockList.append(item)
+    with open("pairlist.csv","w",newlinw="") as f:
+        writer=csv.writer(f)
+        writer.writerows(stockList)
+    return score_matrix, pvalue_matrix, pairs
+
 
 '''
 Read the realdata into the datafame
@@ -145,7 +175,7 @@ changed by siyu
 Get the nasdaq NDX 100 top30 stocks
 '''
 from FinalProject.DataAcquisition import StockDataAcquire
-stocks = StockDataAcquire().GetNasdaq100IndexNDX()[0:10]
+stocks = StockDataAcquire().GetNasdaq100IndexNDX()[0:]
 
 
 
@@ -193,6 +223,7 @@ stocks = stocks + ['SP500']
 # Creating a heatmap to show the p-values of the cointegration test
 
 scores, pvalues, pairs = find_cointegrated_pairs(all_prices)
+
 import seaborn
 m = [0, 0.2, 0.4, 0.6, 0.8, 1]
 seaborn.heatmap(pvalues, xticklabels=stocks,
@@ -201,6 +232,7 @@ seaborn.heatmap(pvalues, xticklabels=stocks,
 plt.show()
 print(pairs)
 
+exit()
 """According to this heatmap which plots the various p-values for all of the pairs, we've got 4 pairs that appear to be cointegrated. Let's plot their ratios on a graph to see what's going on."""
 
 # trade using a simpe strategy
@@ -302,7 +334,122 @@ def trade(S1, S2, window1, window2):
 def zscore(series):
   return (series - series.mean()) / np.std(series)
 
+
 import os
+
+
+for stockPair in pairs:
+    try:
+        print("******** {} vs {} ********".format(stockPair[0],stockPair[1]))
+        # create folder and save plot in folder
+        workfolder='result/{}.{}'.format(stockPair[0],stockPair[1])
+        if not os.path.isdir(workfolder):
+            try:
+                os.mkdir(workfolder)
+            except OSError:
+                print('creat folder faild {}'.format(workfolder))
+        stock1=all_prices[stockPair[0]]
+        stock2=all_prices[stockPair[1]]
+        score, pvalue, _ = coint(stock1, stock2)
+        print(" score :{}".format(score))
+        print(" pvalue:{}".format(pvalue))
+        price_ratios= stock1/stock2
+        price_ratios.plot()
+        plt.axhline(price_ratios.mean())
+        plt.title('{} vs {}'.format(stockPair[0],stockPair[1]))
+        plt.savefig('{}/priceratio.png'.format(workfolder))
+        plt.show()
+
+        
+        zscore(price_ratios).plot()
+        plt.axhline(zscore(price_ratios).mean())
+        plt.axhline(1.0, color='red')
+        plt.axhline(-1.0, color='green')
+        plt.savefig('{}/zscore.png'.format(workfolder))
+        plt.show()
+
+        ratios=all_prices[stockPair[0]] / all_prices[stockPair[1]]
+        #print(len(ratios))
+
+        train=ratios[:2017]
+        test=ratios[2017:]
+
+        ratios_mavg5 = train.rolling(window=5, center=False).mean()
+        ratios_mavg60 = train.rolling(window=60, center=False).mean()
+        std_60 = train.rolling(window=60, center=False).std()
+
+        zscore_60_5 = (ratios_mavg5 - ratios_mavg60)/std_60
+        plt.figure(figsize=(15, 7))
+        plt.plot(train.index, train.values)
+        plt.plot(ratios_mavg5.index, ratios_mavg5.values)
+        plt.plot(ratios_mavg60.index, ratios_mavg60.values)
+
+        plt.legend(['Ratio', '5d Ratio MA', '60d Ratio MA'])
+
+        plt.ylabel('Ratio')
+        plt.savefig('{}/mavg.png'.format(workfolder))
+        plt.show()
+        
+        plt.figure(figsize=(15,7))
+        zscore_60_5.plot()
+        plt.axhline(0, color='black')
+        plt.axhline(1.0, color='red', linestyle='--')
+        plt.axhline(-1.0, color='green', linestyle='--')
+        plt.legend(['Rolling Ratio z-Score', 'Mean', '+1', '-1'])
+        plt.savefig('{}/zscore_60_5.png'.format(workfolder))
+        plt.show()
+
+        plt.figure(figsize=(18,7))
+
+        train[160:].plot()
+        buy = train.copy()
+        sell = train.copy()
+        buy[zscore_60_5>-1] = 0
+        sell[zscore_60_5<1] = 0
+        buy[160:].plot(color='g', linestyle='None', marker='^')
+        sell[160:].plot(color='r', linestyle='None', marker='^')
+        x1, x2, y1, y2 = plt.axis()
+        plt.axis((x1, x2, ratios.min(), ratios.max()))
+        plt.legend(['Ratio', 'Buy Signal', 'Sell Signal'])
+        plt.savefig('{}/train.png'.format(workfolder))
+        plt.show()
+
+        plt.figure(figsize=(18,9))
+        S1 = all_prices[stockPair[0]].iloc[:2017]
+        S2 = all_prices[stockPair[1]].iloc[:2017]
+
+        S1[60:].plot(color='b')
+        S2[60:].plot(color='c')
+        buyR = 0*S1.copy()
+        sellR = 0*S1.copy()
+
+        # When you buy the ratio, you buy stock S1 and sell S2
+        buyR[buy!=0] = S1[buy!=0]
+        sellR[buy!=0] = S2[buy!=0]
+
+        # When you sell the ratio, you sell stock S1 and buy S2
+        buyR[sell!=0] = S2[sell!=0]
+        sellR[sell!=0] = S1[sell!=0]
+
+        buyR[60:].plot(color='g', linestyle='None', marker='^')
+        sellR[60:].plot(color='r', linestyle='None', marker='^')
+        x1, x2, y1, y2 = plt.axis()
+        plt.axis((x1, x2, min(S1.min(), S2.min()), max(S1.max(), S2.max())))
+
+        plt.legend([stockPair[0],stockPair[1], 'Buy Signal', 'Sell Signal'])
+        plt.savefig('{}/stock.png'.format(workfolder))
+        plt.show()
+        #trade(all_prices[stockPair[0]].iloc[:2017],all_prices[stockPair[1]].iloc[:2017],60,5).plot()
+        earning, tradeEarningCurve=trade1(all_prices[stockPair[0]].iloc[:2017],all_prices[stockPair[1]].iloc[:2017],60,5)
+        print("  Earning:{}".format(earning))
+        tradeEarningCurve.plot()
+        plt.show()
+        plt.savefig('{}/earning.png'.format(workfolder))
+    except Exception:
+        pass
+
+
+'''
 for stockPair in pairs:
   print("******** {} vs {} ********".format(stockPair[0],stockPair[1]))
   # create folder and save plot in folder
@@ -412,7 +559,7 @@ for stockPair in pairs:
   plt.show()
   plt.savefig('{}/earning.png'.format(workfolder))
 
-
+'''
 
 """**BOOM! How 'bout dat?** That is beautiful. Now we can clearly see when we should buy or sell on the respective stocks.
 
