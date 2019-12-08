@@ -200,7 +200,52 @@ print(pairs)
 """According to this heatmap which plots the various p-values for all of the pairs, we've got 4 pairs that appear to be cointegrated. Let's plot their ratios on a graph to see what's going on."""
 
 # trade using a simpe strategy
+'''
+trade function, in this function need to return the time serial data that contains the earning in each step
+'''
+def trade1(S1, S2, window1, window2):
+    
+    # If window length is 0, algorithm doesn't make sense, so exit
+    if (window1 == 0) or (window2 == 0):
+        return 0
+    
+    # Compute rolling mean and rolling standard deviation
+    ratios = S1/S2
+    ma1 = ratios.rolling(window=window1,
+                               center=False).mean()
+    ma2 = ratios.rolling(window=window2,
+                               center=False).mean()
+    std = ratios.rolling(window=window2,
+                        center=False).std()
+    zscore = (ma1 - ma2)/std
+    # Simulate trading
+    # Start with no money and no positions
+    money = 0
+    countS1 = 0
+    countS2 = 0
 
+    returnSerial=zscore.copy()
+    for i in range(len(ratios)):
+        # Sell short if the z-score is > 1
+        if zscore[i] < -1:
+            money += S1[i] - S2[i] * ratios[i]
+            countS1 -= 1
+            countS2 += ratios[i]
+            #print('Selling Ratio %s %s %s %s'%(money, ratios[i], countS1,countS2))
+        # Buy long if the z-score is < -1
+        elif zscore[i] > 1:
+            money -= S1[i] - S2[i] * ratios[i]
+            countS1 += 1
+            countS2 -= ratios[i]
+            #print('Buying Ratio %s %s %s %s'%(money,ratios[i], countS1,countS2))
+        # Clear positions if the z-score between -.5 and .5
+        elif abs(zscore[i]) < 0.75:
+            money += S1[i] * countS1 + S2[i] * countS2
+            countS1 = 0
+            countS2 = 0
+            #print('Exit pos %s %s %s %s'%(money,ratios[i], countS1,countS2))
+        returnSerial[i]=money
+    return money, returnSerial
 
 # Trade using a simple strategy
 def trade(S1, S2, window1, window2):
@@ -224,6 +269,8 @@ def trade(S1, S2, window1, window2):
     money = 0
     countS1 = 0
     countS2 = 0
+    print(ratios)
+    returnSerial=zscore.copy()
     for i in range(len(ratios)):
         # Sell short if the z-score is > 1
         if zscore[i] < -1:
@@ -243,6 +290,9 @@ def trade(S1, S2, window1, window2):
             countS1 = 0
             countS2 = 0
             #print('Exit pos %s %s %s %s'%(money,ratios[i], countS1,countS2))
+        print("beforechange:{}  vs ratio {}".format(returnSerial[i], ratios[i]))
+        returnSerial[i]=money
+        print("afterchange:{}".format(returnSerial[i]))
     return money
 
 def zscore(series):
@@ -336,9 +386,13 @@ for stockPair in pairs:
   plt.legend([stockPair[0],stockPair[1], 'Buy Signal', 'Sell Signal'])
   plt.show()
   #trade(all_prices[stockPair[0]].iloc[:2017],all_prices[stockPair[1]].iloc[:2017],60,5).plot()
-  earning=trade(all_prices[stockPair[0]].iloc[:2017],all_prices[stockPair[1]].iloc[:2017],60,5)
+  earning, tradeEarningCurve=trade1(all_prices[stockPair[0]].iloc[:2017],all_prices[stockPair[1]].iloc[:2017],60,5)
   print("  Earning:{}".format(earning))
+  tradeEarningCurve.plot()
   plt.show()
+
+
+
 """**BOOM! How 'bout dat?** That is beautiful. Now we can clearly see when we should buy or sell on the respective stocks.
 
 Let's see how much money we can make off of this strategy, shall we?
