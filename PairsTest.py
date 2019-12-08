@@ -141,7 +141,7 @@ changed by siyu
 Get the nasdaq NDX 100 top30 stocks
 '''
 from FinalProject.DataAcquisition import StockDataAcquire
-stocks = StockDataAcquire().GetNasdaq100IndexNDX()[0:]
+stocks = StockDataAcquire().GetNasdaq100IndexNDX()[0:10]
 
 
 
