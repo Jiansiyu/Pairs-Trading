@@ -141,7 +141,7 @@ changed by siyu
 Get the nasdaq NDX 100 top30 stocks
 '''
 from FinalProject.DataAcquisition import StockDataAcquire
-stocks = StockDataAcquire().GetNasdaq100IndexNDX()[0:10]
+stocks = StockDataAcquire().GetNasdaq100IndexNDX()[0:]
 
 
 
@@ -199,217 +199,6 @@ print(pairs)
 
 """According to this heatmap which plots the various p-values for all of the pairs, we've got 4 pairs that appear to be cointegrated. Let's plot their ratios on a graph to see what's going on."""
 
-def zscore(series):
-  return (series - series.mean()) / np.std(series)
-
-for stockPair in pairs:
-  print("******** {} vs {} ********".format(stockPair[0],stockPair[1]))
-  stock1=all_prices[stockPair[0]]
-  stock2=all_prices[stockPair[1]]
-  score, pvalue, _ = coint(stock1, stock2)
-  print(" score :{}".format(score))
-  print(" pvalue:{}".format(pvalue))
-
-  price_ratios= stock1/stock2
-  price_ratios.plot()
-  plt.axhline(price_ratios.mean())
-  plt.title('{} vs {}'.format(stockPair[0],stockPair[1]))
-  plt.show()
-  
-
-S1 = all_prices['ADBE']
-S2 = all_prices['MSFT']
-score, pvalue, _ = coint(S1, S2)
-print(pvalue)
-am_ratios = S1 / S2
-am_ratios.plot()
-plt.axhline(am_ratios.mean())
-plt.title('ADBE and MSFT')
-plt.legend([' Ratio'])
-plt.show()
-
-S3 = all_prices['SYMC']
-S4 = all_prices['EBAY']
-score, pvalue, _ = coint(S3, S4)
-print(pvalue)
-ratios = S3 / S4
-ratios.plot()
-plt.axhline(ratios.mean())
-plt.title('SYMC and EBAY')
-plt.legend([' Ratio'])
-plt.show()
-
-S5 = all_prices['JNPR']
-S6 = all_prices['AMD']
-score, pvalue, _ = coint(S5, S6)
-print(pvalue)
-ratios = S5 / S6
-ratios.plot()
-plt.axhline(ratios.mean())
-plt.title('JNPR and AMD')
-plt.legend([' Ratio'])
-plt.show()
-
-S7 = all_prices['JNPR']
-S8 = all_prices['IBM']
-score, pvalue, _ = coint(S7, S8)
-print(pvalue)
-ratios = S7 / S8
-ratios.plot()
-plt.axhline(ratios.mean())
-plt.title('JNPR and IBM')
-plt.legend([' Ratio'])
-plt.show()
-
-"""It appears that our first pair, Adobe and Microsoft, has a plot that moves around the mean in the most stable way. Let's stick with this pair. 
-
-What we need to do next is to try to standardize the ratios because the absolute ratio might not be the most ideal. We need to use z-scores.
-
-Remember from stats class? The z score is calculated by:
-
-###*Z Score (Value) = (Value - Mean) / Standard Deviation*
-"""
-
-#def zscore(series):
-#  return (series - series.mean()) / np.std(series)
-
-zscore(am_ratios).plot()
-plt.axhline(zscore(am_ratios).mean())
-plt.axhline(1.0, color='red')
-plt.axhline(-1.0, color='green')
-plt.show()
-
-"""By setting two other lines placed at the z-scores of 1 and -1, we can clearly see that for the most part, any big divergences from the mean eventually converge back. This is exactly what we want for pair trading.
-
-## Trading Signals
-
-When conducting any type of trading strategy, it's always important to clearly define and delineate at what point you will actually do a trade. As in, what is the best INDICATOR that I need to buy or sell a particular stock? That's what a trading signal is.
-
-Let's break down a clear plan for creating our trading signals.
-
-### Setup rules
-
-If we're going to look at our ratio and see if it's telling us to buy or sell at a particular moment in time, let's create a prediction variable Y:
-
-*Y = Ratio is buy (1) or sell(-1)*
-
-*Y(t) = Sign(Ratio(t+1) - Ratio(t))*
-
-What's great about pair trading signals is that we don't need to know absolutes about where the prices will go, all we need to know is where it's heading: up or down.
-
-### Train Test Split
-
-When training and testing a model, it's common to have splits like 70/30 or 80/20. Because our data is from 2000-12-12 to 2016-12-12, I'll split it 11 years (~70%) and 5 years (~30%).
-"""
-
-ratios = all_prices['ADBE'] / all_prices['MSFT']
-print(len(ratios))
-
-train = ratios[:2017]
-test = ratios[2017:]
-
-"""### Feature Engineering
-
-We need to find out what features are actually important in determining the direction of the ratio moves. Knowing that the ratios always eventually revert back to the mean, maybe the moving averages and metrics related to the mean will be important.
-
-Let's try using these features:
-
-
-
-*   60 day Moving Average of Ratio
-*   5 day Moving Average of Ratio
-*   60 day Standard Deviation
-*   z score
-"""
-
-ratios_mavg5 = train.rolling(window=5, center=False).mean()
-
-ratios_mavg60 = train.rolling(window=60, center=False).mean()
-
-std_60 = train.rolling(window=60, center=False).std()
-
-zscore_60_5 = (ratios_mavg5 - ratios_mavg60)/std_60
-plt.figure(figsize=(15, 7))
-plt.plot(train.index, train.values)
-plt.plot(ratios_mavg5.index, ratios_mavg5.values)
-plt.plot(ratios_mavg60.index, ratios_mavg60.values)
-
-plt.legend(['Ratio', '5d Ratio MA', '60d Ratio MA'])
-
-plt.ylabel('Ratio')
-plt.show()
-
-"""That's pretty. And enlightening! Let's also take a look at the moving average z-scores."""
-
-plt.figure(figsize=(15,7))
-zscore_60_5.plot()
-plt.axhline(0, color='black')
-plt.axhline(1.0, color='red', linestyle='--')
-plt.axhline(-1.0, color='green', linestyle='--')
-plt.legend(['Rolling Ratio z-Score', 'Mean', '+1', '-1'])
-plt.show()
-
-"""### Creating a Model
-
-Taking a look at our z-score chart, it's pretty clear that if the absolute value of the z-score gets too high, it tends to revert back. We can keep using our +1/-1 ratios as thresholds, and we can create a model to generate a trading signal:
-
-
-*   Buy (1) whenever the z-score is below -1.0 because we expect the ratio to increase
-*   Sell (-1) whenever the z-score is above 1.0 because we expect the ratio to decrease
-
-### Training and Optimizing
-
-How well does our model work on actual data? Bet you're dying to figure out.
-"""
-
-plt.figure(figsize=(18,7))
-
-train[160:].plot()
-buy = train.copy()
-sell = train.copy()
-buy[zscore_60_5>-1] = 0
-sell[zscore_60_5<1] = 0
-buy[160:].plot(color='g', linestyle='None', marker='^')
-sell[160:].plot(color='r', linestyle='None', marker='^')
-x1, x2, y1, y2 = plt.axis()
-plt.axis((x1, x2, ratios.min(), ratios.max()))
-plt.legend(['Ratio', 'Buy Signal', 'Sell Signal'])
-plt.show()
-
-"""So these are the trading signals for the ratios up to around 2009. 
-
-Of course, this is just the trading signals for the ratios, what about the actual stocks?
-"""
-
-plt.figure(figsize=(18,9))
-S1 = all_prices['ADBE'].iloc[:2017]
-S2 = all_prices['MSFT'].iloc[:2017]
-
-S1[60:].plot(color='b')
-S2[60:].plot(color='c')
-buyR = 0*S1.copy()
-sellR = 0*S1.copy()
-
-# When you buy the ratio, you buy stock S1 and sell S2
-buyR[buy!=0] = S1[buy!=0]
-sellR[buy!=0] = S2[buy!=0]
-
-# When you sell the ratio, you sell stock S1 and buy S2
-buyR[sell!=0] = S2[sell!=0]
-sellR[sell!=0] = S1[sell!=0]
-
-buyR[60:].plot(color='g', linestyle='None', marker='^')
-sellR[60:].plot(color='r', linestyle='None', marker='^')
-x1, x2, y1, y2 = plt.axis()
-plt.axis((x1, x2, min(S1.min(), S2.min()), max(S1.max(), S2.max())))
-
-plt.legend(['ADBE', 'MSFT', 'Buy Signal', 'Sell Signal'])
-plt.show()
-
-"""**BOOM! How 'bout dat?** That is beautiful. Now we can clearly see when we should buy or sell on the respective stocks.
-
-Let's see how much money we can make off of this strategy, shall we?
-"""
 
 # Trade using a simple strategy
 def trade(S1, S2, window1, window2):
@@ -452,18 +241,114 @@ def trade(S1, S2, window1, window2):
             countS1 = 0
             countS2 = 0
             #print('Exit pos %s %s %s %s'%(money,ratios[i], countS1,countS2))
-            
-            
     return money
 
-trade(all_prices['MSFT'].iloc[:2017], all_prices['ADBE'].iloc[:2017], 60, 5)
+def zscore(series):
+  return (series - series.mean()) / np.std(series)
+
+for stockPair in pairs:
+  print("******** {} vs {} ********".format(stockPair[0],stockPair[1]))
+  stock1=all_prices[stockPair[0]]
+  stock2=all_prices[stockPair[1]]
+  score, pvalue, _ = coint(stock1, stock2)
+  print(" score :{}".format(score))
+  print(" pvalue:{}".format(pvalue))
+
+  price_ratios= stock1/stock2
+  price_ratios.plot()
+  plt.axhline(price_ratios.mean())
+  plt.title('{} vs {}'.format(stockPair[0],stockPair[1]))
+  plt.show()
+  
+  zscore(price_ratios).plot()
+  plt.axhline(zscore(price_ratios).mean())
+  plt.axhline(1.0, color='red')
+  plt.axhline(-1.0, color='green')
+  plt.show()
+
+  ratios=all_prices[stockPair[0]] / all_prices[stockPair[1]]
+  #print(len(ratios))
+
+  train=ratios[:2017]
+  test=ratios[2017:]
+
+  ratios_mavg5 = train.rolling(window=5, center=False).mean()
+  ratios_mavg60 = train.rolling(window=60, center=False).mean()
+  std_60 = train.rolling(window=60, center=False).std()
+
+  zscore_60_5 = (ratios_mavg5 - ratios_mavg60)/std_60
+  plt.figure(figsize=(15, 7))
+  plt.plot(train.index, train.values)
+  plt.plot(ratios_mavg5.index, ratios_mavg5.values)
+  plt.plot(ratios_mavg60.index, ratios_mavg60.values)
+
+  plt.legend(['Ratio', '5d Ratio MA', '60d Ratio MA'])
+
+  plt.ylabel('Ratio')
+  plt.show()
+  
+  plt.figure(figsize=(15,7))
+  zscore_60_5.plot()
+  plt.axhline(0, color='black')
+  plt.axhline(1.0, color='red', linestyle='--')
+  plt.axhline(-1.0, color='green', linestyle='--')
+  plt.legend(['Rolling Ratio z-Score', 'Mean', '+1', '-1'])
+  plt.show()
+
+  plt.figure(figsize=(18,7))
+
+  train[160:].plot()
+  buy = train.copy()
+  sell = train.copy()
+  buy[zscore_60_5>-1] = 0
+  sell[zscore_60_5<1] = 0
+  buy[160:].plot(color='g', linestyle='None', marker='^')
+  sell[160:].plot(color='r', linestyle='None', marker='^')
+  x1, x2, y1, y2 = plt.axis()
+  plt.axis((x1, x2, ratios.min(), ratios.max()))
+  plt.legend(['Ratio', 'Buy Signal', 'Sell Signal'])
+  plt.show()
+
+  plt.figure(figsize=(18,9))
+  S1 = all_prices[stockPair[0]].iloc[:2017]
+  S2 = all_prices[stockPair[1]].iloc[:2017]
+
+  S1[60:].plot(color='b')
+  S2[60:].plot(color='c')
+  buyR = 0*S1.copy()
+  sellR = 0*S1.copy()
+
+  # When you buy the ratio, you buy stock S1 and sell S2
+  buyR[buy!=0] = S1[buy!=0]
+  sellR[buy!=0] = S2[buy!=0]
+
+  # When you sell the ratio, you sell stock S1 and buy S2
+  buyR[sell!=0] = S2[sell!=0]
+  sellR[sell!=0] = S1[sell!=0]
+
+  buyR[60:].plot(color='g', linestyle='None', marker='^')
+  sellR[60:].plot(color='r', linestyle='None', marker='^')
+  x1, x2, y1, y2 = plt.axis()
+  plt.axis((x1, x2, min(S1.min(), S2.min()), max(S1.max(), S2.max())))
+
+  plt.legend([stockPair[0],stockPair[1], 'Buy Signal', 'Sell Signal'])
+  plt.show()
+  #trade(all_prices[stockPair[0]].iloc[:2017],all_prices[stockPair[1]].iloc[:2017],60,5).plot()
+  earning=trade(all_prices[stockPair[0]].iloc[:2017],all_prices[stockPair[1]].iloc[:2017],60,5)
+  print("  Earning:{}".format(earning))
+  plt.show()
+"""**BOOM! How 'bout dat?** That is beautiful. Now we can clearly see when we should buy or sell on the respective stocks.
+
+Let's see how much money we can make off of this strategy, shall we?
+"""
+#trade(all_prices['MSFT'].iloc[:2017], all_prices['ADBE'].iloc[:2017], 60, 5)
 
 """### Backtest on Test Data
 
 Let's test our function on the test data (2010-2016)
 """
 
-trade(all_prices['MSFT'].iloc[2018:], all_prices['ADBE'].iloc[2018:], 60, 5)
+#trade(all_prices['MSFT'].iloc[2018:], all_prices['ADBE'].iloc[2018:], 60, 5)
 
 """Looks like our strategy is profitable! Given that this data is occuring smack in the middle of the Great Recession, I'd say that's not bad!
 
