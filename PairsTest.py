@@ -7,11 +7,15 @@ sys.path.append(dirname('/home/newdriver/Learning/Python/FinalProject'))
 import numpy as np
 import pandas as pd
 
+import matplotlib
 import matplotlib.pyplot as plt
 import statsmodels
 from statsmodels.tsa.stattools import coint
 import statsmodels.api as sm
 
+matplotlib.use('Agg')
+# Turn interactive plotting off
+plt.ioff()
 
 np.random.seed(107) # So that you can get the same random numbers as me
 
@@ -298,8 +302,17 @@ def trade(S1, S2, window1, window2):
 def zscore(series):
   return (series - series.mean()) / np.std(series)
 
+import os
 for stockPair in pairs:
   print("******** {} vs {} ********".format(stockPair[0],stockPair[1]))
+  # create folder and save plot in folder
+  workfolder='result/{}.{}'.format(stockPair[0],stockPair[1])
+  if not os.path.isdir(workfolder):
+      try:
+          os.mkdir(workfolder)
+      except OSError:
+          print('creat folder faild {}'.format(workfolder))
+
   stock1=all_prices[stockPair[0]]
   stock2=all_prices[stockPair[1]]
   score, pvalue, _ = coint(stock1, stock2)
@@ -310,12 +323,15 @@ for stockPair in pairs:
   price_ratios.plot()
   plt.axhline(price_ratios.mean())
   plt.title('{} vs {}'.format(stockPair[0],stockPair[1]))
+  plt.savefig('{}/priceratio.png'.format(workfolder))
   plt.show()
+
   
   zscore(price_ratios).plot()
   plt.axhline(zscore(price_ratios).mean())
   plt.axhline(1.0, color='red')
   plt.axhline(-1.0, color='green')
+  plt.savefig('{}/zscore.png'.format(workfolder))
   plt.show()
 
   ratios=all_prices[stockPair[0]] / all_prices[stockPair[1]]
@@ -337,6 +353,7 @@ for stockPair in pairs:
   plt.legend(['Ratio', '5d Ratio MA', '60d Ratio MA'])
 
   plt.ylabel('Ratio')
+  plt.savefig('{}/mavg.png'.format(workfolder))
   plt.show()
   
   plt.figure(figsize=(15,7))
@@ -345,6 +362,7 @@ for stockPair in pairs:
   plt.axhline(1.0, color='red', linestyle='--')
   plt.axhline(-1.0, color='green', linestyle='--')
   plt.legend(['Rolling Ratio z-Score', 'Mean', '+1', '-1'])
+  plt.savefig('{}/zscore_60_5.png'.format(workfolder))
   plt.show()
 
   plt.figure(figsize=(18,7))
@@ -359,6 +377,7 @@ for stockPair in pairs:
   x1, x2, y1, y2 = plt.axis()
   plt.axis((x1, x2, ratios.min(), ratios.max()))
   plt.legend(['Ratio', 'Buy Signal', 'Sell Signal'])
+  plt.savefig('{}/train.png'.format(workfolder))
   plt.show()
 
   plt.figure(figsize=(18,9))
@@ -384,12 +403,14 @@ for stockPair in pairs:
   plt.axis((x1, x2, min(S1.min(), S2.min()), max(S1.max(), S2.max())))
 
   plt.legend([stockPair[0],stockPair[1], 'Buy Signal', 'Sell Signal'])
+  plt.savefig('{}/stock.png'.format(workfolder))
   plt.show()
   #trade(all_prices[stockPair[0]].iloc[:2017],all_prices[stockPair[1]].iloc[:2017],60,5).plot()
   earning, tradeEarningCurve=trade1(all_prices[stockPair[0]].iloc[:2017],all_prices[stockPair[1]].iloc[:2017],60,5)
   print("  Earning:{}".format(earning))
   tradeEarningCurve.plot()
   plt.show()
+  plt.savefig('{}/earning.png'.format(workfolder))
 
 
 
