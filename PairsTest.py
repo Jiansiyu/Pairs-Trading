@@ -199,6 +199,8 @@ print(pairs)
 
 """According to this heatmap which plots the various p-values for all of the pairs, we've got 4 pairs that appear to be cointegrated. Let's plot their ratios on a graph to see what's going on."""
 
+# trade using a simpe strategy
+
 
 # Trade using a simple strategy
 def trade(S1, S2, window1, window2):
