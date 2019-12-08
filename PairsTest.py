@@ -109,7 +109,6 @@ When α is larger than usual, we sell Y and buy X.
 
 Now let's find some actual securities that are cointegrated based on historical data.
 """
-'''
 def find_cointegrated_pairs(data):
   n = data.shape[1]
   score_matrix = np.zeros((n, n))
@@ -125,7 +124,7 @@ def find_cointegrated_pairs(data):
       pvalue = result[1]
       score_matrix[i,j] = score
       pvalue_matrix[i, j] = pvalue
-      if pvalue < 0.002:
+      if pvalue < 0.002 and pvalue >0.0:
         pairs.append((keys[i], keys[j]))
   return score_matrix, pvalue_matrix, pairs
 '''
@@ -146,17 +145,14 @@ def find_cointegrated_pairs(data):
             pvalue = result[1]
             score_matrix[i,j] = score
             pvalue_matrix[i, j] = pvalue
-            if pvalue < 0.002:
+            if pvalue < 0.02:
                 pairs.append((keys[i], keys[j]))
-                item=[]
-                item.append(score)
-                item.append(pvalue)
-                item.append(pairs)
-                stockList.append(item)
-    with open("pairlist.csv","w",newlinw="") as f:
+                stockList.append([score,pvalue,keys[i],keys[j]])
+    with open("pairlist.csv","w",newline="") as f:
         writer=csv.writer(f)
         writer.writerows(stockList)
     return score_matrix, pvalue_matrix, pairs
+'''
 
 
 '''
@@ -232,7 +228,6 @@ seaborn.heatmap(pvalues, xticklabels=stocks,
 plt.show()
 print(pairs)
 
-exit()
 """According to this heatmap which plots the various p-values for all of the pairs, we've got 4 pairs that appear to be cointegrated. Let's plot their ratios on a graph to see what's going on."""
 
 # trade using a simpe strategy
